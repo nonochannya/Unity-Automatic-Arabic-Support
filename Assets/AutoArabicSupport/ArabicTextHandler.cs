@@ -261,14 +261,17 @@ public class ArabicTextHandler : MonoBehaviour
         
         foreach (char c in text)
         {
-            // Using the exact Unicode ranges you specified:
-            // 0600-06FF: Arabic block
-            // 0750-077F: Arabic Supplement  
-            // 08A0-08FF: Arabic Extended-A
-            // FB50-FDFF: Arabic Presentation Forms-A
-            // FE70-FEFF: Arabic Presentation Forms-B
             if(UseTheleftUnicodes)
-                return true; // yes I'm super lasy
+            {
+                // Using the exact Unicode ranges you specified:
+                // 0600-06FF: Arabic block
+                // 0750-077F: Arabic Supplement  
+                // 08A0-08FF: Arabic Extended-A
+                // FB50-FDFF: Arabic Presentation Forms-A
+                // FE70-FEFF: Arabic Presentation Forms-B
+                //unicodes
+                return true; // yes I'm super lasy and I assume you know what you're doing
+            }
             
             if ((c >= 0x0600 && c <= 0x06FF) ||
                 (c >= 0x0750 && c <= 0x077F) ||
