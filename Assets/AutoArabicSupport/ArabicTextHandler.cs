@@ -32,25 +32,28 @@ public class ArabicTextHandler : MonoBehaviour
     public bool skipErrorCausingCharacters = true;
     public bool logErrors = true;
 
-    [Header("Typing Effect Support")] /// <I> 
+    [Header("Typing Effect Support")]
+    [Tooltip("These are meant to be changed by methods, not from the inspector!")]
     public bool pauseProcessing = false;  // Flag to pause processing during typing effects
     public bool autoProcessAfterTyping = true;  // Auto-process after typing completes
-    
+
     [Header("Debug Info")]
     [SerializeField] private bool containsArabic = false;
     [SerializeField] private string lastProcessedText = "";
     public string lastError = "";
-    
+
     [NonSerialized] public string previousRawText = "";
     [NonSerialized] public string lastFixedText = "";
     [NonSerialized] public bool isProcessing = false;
-    
+
     // Track if we're in a typing effect
     private bool inTypingEffect = false;
     private string pendingText = "";
 
-    [Header("Additionall settings -do not touch unless you need =￣ω￣=")]
-    public readonly string  types = "ArabicBlock\nArabicSupplement\nArabicExtended_A\nArabicPresentationForms_A\nArabicPresentationForms_B";
+    [Header("Additional Settings")]
+    [Tooltip("Do not touch unless you need to (=^･ω･^=)")]
+    [TextArea(2, 5)]
+    public string types = "ArabicBlock\nArabicSupplement\nArabicExtended_A\nArabicPresentationForms_A\nArabicPresentationForms_B";
     public bool UseTheleftUnicodes = false;
     
     void Awake()
@@ -261,17 +264,14 @@ public class ArabicTextHandler : MonoBehaviour
         
         foreach (char c in text)
         {
+            // Using the exact Unicode ranges you specified:
+            // 0600-06FF: Arabic block
+            // 0750-077F: Arabic Supplement  
+            // 08A0-08FF: Arabic Extended-A
+            // FB50-FDFF: Arabic Presentation Forms-A
+            // FE70-FEFF: Arabic Presentation Forms-B
             if(UseTheleftUnicodes)
-            {
-                // Using the exact Unicode ranges you specified:
-                // 0600-06FF: Arabic block
-                // 0750-077F: Arabic Supplement  
-                // 08A0-08FF: Arabic Extended-A
-                // FB50-FDFF: Arabic Presentation Forms-A
-                // FE70-FEFF: Arabic Presentation Forms-B
-                //unicodes
-                return true; // yes I'm super lasy and I assume you know what you're doing
-            }
+                return true; // yes I'm super lasy
             
             if ((c >= 0x0600 && c <= 0x06FF) ||
                 (c >= 0x0750 && c <= 0x077F) ||
