@@ -2,89 +2,165 @@ using UnityEditor;
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
 
 [InitializeOnLoad]
 public class TMP_AutoAttach
 {
-    // Keep track of TMP_Text components we've already processed
     private static HashSet<int> processedTextComponents = new HashSet<int>();
-    
-    // Time to clear the cache (in seconds)
-    private static double cacheClearInterval = 60.0;
-    private static double lastCacheClearTime;
-    
+    private static double lastFullScanTime;
+    private static double fullScanInterval = 30.0;
+    private static bool isProcessing = false;
+
     static TMP_AutoAttach()
     {
         EditorApplication.hierarchyChanged += OnHierarchyChanged;
+        EditorApplication.update += OnEditorUpdate;
+        ObjectFactory.componentWasAdded += OnComponentAdded;
+        EditorSceneManager.sceneOpened += OnSceneOpened;
+        EditorSceneManager.sceneSaved += OnSceneSaved;
+        PrefabStage.prefabStageOpened += OnPrefabStageOpened;
+        PrefabUtility.prefabInstanceUpdated += OnPrefabInstanceUpdated;
         
-        // Initialize with existing TMP_Text components
-        InitializeCache();
+        EditorApplication.delayCall += () => PerformFullScan(true);
     }
 
-    private static void InitializeCache()
+    private static void OnEditorUpdate()
     {
-        processedTextComponents.Clear();
-        lastCacheClearTime = EditorApplication.timeSinceStartup;
-        
-        TMP_Text[] existingTextComponents = Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (TMP_Text textComponent in existingTextComponents)
+        if (EditorApplication.isPlaying || EditorApplication.isCompiling || isProcessing)
+            return;
+
+        double currentTime = EditorApplication.timeSinceStartup;
+        if (currentTime - lastFullScanTime > fullScanInterval)
         {
-            if (PrefabUtility.IsPartOfPrefabAsset(textComponent.gameObject))
-                processedTextComponents.Add(textComponent.GetInstanceID());
-            else 
-                processedTextComponents.Add(textComponent.GetInstanceID());
+            PerformFullScan(false);
+        }
+    }
+
+    private static void OnComponentAdded(Component component)
+    {
+        if (component is TMP_Text tmpText)
+        {
+            ProcessSingleComponent(tmpText);
         }
     }
 
     private static void OnHierarchyChanged()
     {
-        // Don't process in play mode
-        if (EditorApplication.isPlaying)
-            return;
-        
-        // Check if we should clear the cache
-        double currentTime = EditorApplication.timeSinceStartup;
-        if (currentTime - lastCacheClearTime > cacheClearInterval)
+        if (!EditorApplication.isPlaying && !isProcessing)
         {
-            InitializeCache();
+            ProcessAllComponents(false);
+        }
+    }
+
+    private static void OnSceneOpened(Scene scene, OpenSceneMode mode)
+    {
+        EditorApplication.delayCall += () => PerformFullScan(false);
+    }
+
+    private static void OnSceneSaved(Scene scene)
+    {
+        ProcessAllComponents(false);
+    }
+
+    private static void OnPrefabStageOpened(PrefabStage prefabStage)
+    {
+        EditorApplication.delayCall += () => PerformFullScan(false);
+    }
+
+    private static void OnPrefabInstanceUpdated(GameObject instance)
+    {
+        TMP_Text[] textComponents = instance.GetComponentsInChildren<TMP_Text>(true);
+        foreach (TMP_Text textComponent in textComponents)
+        {
+            ProcessSingleComponent(textComponent);
+        }
+    }
+
+    private static void PerformFullScan(bool clearCache)
+    {
+        if (isProcessing) return;
+        
+        isProcessing = true;
+        
+        if (clearCache)
+        {
+            processedTextComponents.Clear();
         }
         
-        // Get all TMP_Text components in the scene
+        lastFullScanTime = EditorApplication.timeSinceStartup;
+        ProcessAllComponents(true);
+        
+        isProcessing = false;
+    }
+
+    private static void ProcessAllComponents(bool logChanges)
+    {
+        if (EditorApplication.isPlaying) return;
+
         TMP_Text[] allTextComponents = Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        
         bool changesMade = false;
-        
+
         foreach (TMP_Text textComponent in allTextComponents)
         {
+            if (textComponent == null) continue;
+            
             int instanceID = textComponent.GetInstanceID();
             
-            // Skip if we've already processed this component
-            if (processedTextComponents.Contains(instanceID))
-                continue;
-                
-            // Check if the component already has ArabicTextHandler
-            if (textComponent.GetComponent<ArabicTextHandler>() == null)
+            if (!processedTextComponents.Contains(instanceID))
             {
-                // Register undo operation
-                Undo.RecordObject(textComponent.gameObject, "Add Arabic Text Handler");
-                
-                // Add the component and set the reference
-                ArabicTextHandler arabicHandler = textComponent.gameObject.AddComponent<ArabicTextHandler>();
-                arabicHandler.textComponent = textComponent;
-                
-                // Mark as dirty to ensure changes are saved
-                EditorUtility.SetDirty(textComponent.gameObject);
-                
-                changesMade = true;
+                if (AttachArabicHandler(textComponent))
+                {
+                    changesMade = true;
+                }
+                processedTextComponents.Add(instanceID);
             }
-            
-            // Mark this component as processed
+            else if (textComponent.GetComponent<ArabicTextHandler>() == null)
+            {
+                if (AttachArabicHandler(textComponent))
+                {
+                    changesMade = true;
+                }
+            }
+        }
+
+        if (changesMade && logChanges)
+        {
+            Debug.Log($"ArabicTextHandler attached to {allTextComponents.Length} TMP components");
+        }
+    }
+
+    private static void ProcessSingleComponent(TMP_Text textComponent)
+    {
+        if (textComponent == null || EditorApplication.isPlaying) return;
+
+        int instanceID = textComponent.GetInstanceID();
+        
+        if (!processedTextComponents.Contains(instanceID) || textComponent.GetComponent<ArabicTextHandler>() == null)
+        {
+            AttachArabicHandler(textComponent);
             processedTextComponents.Add(instanceID);
         }
+    }
+
+    private static bool AttachArabicHandler(TMP_Text textComponent)
+    {
+        if (textComponent.GetComponent<ArabicTextHandler>() != null)
+            return false;
+
+        Undo.RecordObject(textComponent.gameObject, "Add Arabic Text Handler");
         
-        if (changesMade)
+        ArabicTextHandler arabicHandler = textComponent.gameObject.AddComponent<ArabicTextHandler>();
+        arabicHandler.textComponent = textComponent;
+        
+        EditorUtility.SetDirty(textComponent.gameObject);
+        
+        if (!EditorApplication.isPlaying)
         {
-            Debug.Log("ArabicTextHandler components added to TextMeshPro objects.");
+            PrefabUtility.RecordPrefabInstancePropertyModifications(textComponent.gameObject);
         }
+        
+        return true;
     }
 }
