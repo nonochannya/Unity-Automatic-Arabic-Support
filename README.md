@@ -39,8 +39,9 @@ See your Arabic text correctly formatted right in the Unity Editor - no need to 
 ## 🚀 Quick Start
 
 ### Installation
-1. Import the original Arabic Support package (we're standing on the shoulders of giants here!)
-2. Add these three scripts to your project:
+- Import the original Arabic Support package (we're standing on the shoulders of giants here!)
+   OR
+- Add these three scripts to your project:
    - `ArabicSupport.cs` (if not already there)
    - `ArabicTextHandler.cs`
    - `TMP_AutoAttach.cs`
